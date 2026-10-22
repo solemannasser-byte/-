@@ -216,6 +216,8 @@
           <a href="#directory">ابحث حسب المنطقة ←</a>
         </article>
       </div>
+      <div id="live-services" class="grid" style="margin-top:20px"></div>
+<p id="services-status" role="status"></p>
     </section>
 
     <section id="directory" style="margin-top:42px">
@@ -285,3 +287,90 @@
   </script>
 </body>
 </html>
+<script src="https://svjubkpurykogmjdikbz.supabase.co "></script>
+<script>
+  document.getElementById("year").textContent = new Date().getFullYear();
+  // sb_publishable_ovINCAoeDE7dNpG_Eia3_g_OEtr8oAh
+  
+async function loadServices() {
+  const container = document.getElementById("live-services");
+  const status = document.getElementById("services-status");
+
+  if (!container || !status) return;
+
+  status.textContent = "جاري تحميل الخدمات...";
+
+  try {
+    const { data, error } = await supabaseClient
+      .from("service_providers")
+      .select("id, name, category, phone, whatsapp, governorate_id, district, address, description, services")
+      .eq("status", "published")
+      .order("name");
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      status.textContent = "ما في خدمات منشورة حاليًا. ستظهر الخدمات هنا عند إضافتها ونشرها.";
+      return;
+    }
+
+    const categories = {
+      vet: "طبيب بيطري",
+      breeding: "التناسل والتلقيح",
+      training: "التدريب",
+      supplies: "مستلزمات الخيل"
+    };
+
+    container.replaceChildren();
+
+    data.forEach((item) => {
+      const card = document.createElement("article");
+      card.className = "service";
+
+      const title = document.createElement("h3");
+      title.textContent = item.name || "خدمة خيل";
+
+      const type = document.createElement("p");
+      type.textContent = categories[item.category] || "خدمة";
+
+      const details = document.createElement("p");
+      details.textContent = [
+        item.governorate_id ? "المحافظة مسجلة" : "",
+        item.district || "",
+        item.address || "",
+        item.description || ""
+      ].filter(Boolean).join(" — ");
+
+      card.append(title, type, details);
+
+      if (item.phone) {
+        const phone = document.createElement("a");
+        phone.href = "tel:" + item.phone;
+        phone.textContent = "اتصل: " + item.phone;
+        card.append(phone);
+      }
+
+      if (item.whatsapp) {
+        const whatsapp = document.createElement("p");
+        const link = document.createElement("a");
+        link.href = "https://wa.me/" + item.whatsapp.replace(/\D/g, "");
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = "تواصل عبر واتساب";
+        whatsapp.append(link);
+        card.append(whatsapp);
+      }
+
+      container.append(card);
+    });
+
+    status.textContent = "تم تحميل " + data.length + " خدمة.";
+  } catch (error) {
+    console.error("Supabase services error:", error);
+    status.textContent = "تعذّر تحميل الخدمات. سنتحقق من إعدادات الاتصال والصلاحيات.";
+  }
+}
+
+loadServices();
+
+</script>
