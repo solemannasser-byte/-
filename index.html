@@ -223,7 +223,7 @@
     <section id="directory" style="margin-top:42px">
       <div class="section-head">
         <h2>ابحث عن خدمة</h2>
-        <p>واجهة البحث جاهزة مبدئيًا؛ سنربطها بقاعدة البيانات في الخطوة القادمة.</p>
+        <p>ابحث عن خدمات الخيل في جميع محافظات الأردن.</p>
       </div>
       <form class="search-box" id="search-form">
         <select id="category" aria-label="نوع الخدمة">
@@ -292,6 +292,22 @@
   document.getElementById("year").textContent = new Date().getFullYear();
   // sb_publishable_ovINCAoeDE7dNpG_Eia3_g_OEtr8oAh
   
+
+const categories = {
+  vet: "طبيب بيطري",
+  breeding: "التناسل والتلقيح",
+  training: "التدريب",
+  supplies: "مستلزمات الخيل"
+};
+
+
+const categories = {
+  vet: "طبيب بيطري",
+  breeding: "التناسل والتلقيح",
+  training: "التدريب",
+  supplies: "مستلزمات الخيل"
+};
+
 async function loadServices() {
   const container = document.getElementById("live-services");
   const status = document.getElementById("services-status");
@@ -303,74 +319,106 @@ async function loadServices() {
   try {
     const { data, error } = await supabaseClient
       .from("service_providers")
-      .select("id, name, category, phone, whatsapp, governorate_id, district, address, description, services")
+      .select(`
+        id, name, category, phone, whatsapp,
+        district, address, description, services,
+        governorates (name_ar)
+      `)
       .eq("status", "published")
       .order("name");
 
     if (error) throw error;
 
-    if (!data || data.length === 0) {
-      status.textContent = "ما في خدمات منشورة حاليًا. ستظهر الخدمات هنا عند إضافتها ونشرها.";
-      return;
+    const categoryFilter = document.getElementById("category");
+    const governorateFilter = document.getElementById("governorate");
+    const form = document.getElementById("search-form");
+
+    function renderServices() {
+      const selectedCategory = categoryFilter?.value || "";
+      const selectedGovernorate = governorateFilter?.value || "";
+
+      const filtered = (data || []).filter((item) => {
+        const governorateName = item.governorates?.name_ar || "";
+
+        return (
+          (!selectedCategory || item.category === selectedCategory) &&
+          (!selectedGovernorate ||
+            governorateName === selectedGovernorate)
+        );
+      });
+
+      container.replaceChildren();
+
+      if (filtered.length === 0) {
+        status.textContent =
+          "ما لقينا خدمات مطابقة لبحثك حاليًا.";
+        return;
+      }
+
+      filtered.forEach((item) => {
+        const card = document.createElement("article");
+        card.className = "service";
+
+        const title = document.createElement("h3");
+        title.textContent = item.name || "خدمة خيل";
+
+        const type = document.createElement("p");
+        type.textContent = categories[item.category] || "خدمة";
+
+        const governorateName = item.governorates?.name_ar || "";
+
+        const details = document.createElement("p");
+        details.textContent = [
+          governorateName,
+          item.district,
+          item.address,
+          item.description
+        ].filter(Boolean).join(" — ");
+
+        card.append(title, type, details);
+
+        if (item.phone) {
+          const phone = document.createElement("a");
+          phone.href = "tel:" + item.phone;
+          phone.textContent = "اتصل: " + item.phone;
+          card.append(phone);
+        }
+
+        if (item.whatsapp) {
+          const whatsapp = document.createElement("a");
+          whatsapp.href =
+            "https://wa.me/" + item.whatsapp.replace(/\D/g, "");
+          whatsapp.target = "_blank";
+          whatsapp.rel = "noopener noreferrer";
+          whatsapp.textContent = "تواصل عبر واتساب";
+          card.append(whatsapp);
+        }
+
+        container.append(card);
+      });
+
+      status.textContent =
+        "عدد الخدمات المطابقة: " + filtered.length;
     }
 
-    const categories = {
-      vet: "طبيب بيطري",
-      breeding: "التناسل والتلقيح",
-      training: "التدريب",
-      supplies: "مستلزمات الخيل"
-    };
-
-    container.replaceChildren();
-
-    data.forEach((item) => {
-      const card = document.createElement("article");
-      card.className = "service";
-
-      const title = document.createElement("h3");
-      title.textContent = item.name || "خدمة خيل";
-
-      const type = document.createElement("p");
-      type.textContent = categories[item.category] || "خدمة";
-
-      const details = document.createElement("p");
-      details.textContent = [
-        item.governorate_id ? "المحافظة مسجلة" : "",
-        item.district || "",
-        item.address || "",
-        item.description || ""
-      ].filter(Boolean).join(" — ");
-
-      card.append(title, type, details);
-
-      if (item.phone) {
-        const phone = document.createElement("a");
-        phone.href = "tel:" + item.phone;
-        phone.textContent = "اتصل: " + item.phone;
-        card.append(phone);
-      }
-
-      if (item.whatsapp) {
-        const whatsapp = document.createElement("p");
-        const link = document.createElement("a");
-        link.href = "https://wa.me/" + item.whatsapp.replace(/\D/g, "");
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        link.textContent = "تواصل عبر واتساب";
-        whatsapp.append(link);
-        card.append(whatsapp);
-      }
-
-      container.append(card);
+    form?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      renderServices();
     });
 
-    status.textContent = "تم تحميل " + data.length + " خدمة.";
+    categoryFilter?.addEventListener("change", renderServices);
+    governorateFilter?.addEventListener("change", renderServices);
+
+    renderServices();
   } catch (error) {
     console.error("Supabase services error:", error);
-    status.textContent = "تعذّر تحميل الخدمات. سنتحقق من إعدادات الاتصال والصلاحيات.";
+    status.textContent =
+      "تعذّر تحميل الخدمات. تحقق من الاتصال أو علاقة جدول المحافظات.";
   }
 }
 
 loadServices();
+
+
 
 </script>
